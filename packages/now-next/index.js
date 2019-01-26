@@ -76,7 +76,11 @@ exports.config = {
  * @param {BuildParamsType} buildParams
  * @returns {Promise<Files>}
  */
-exports.build = async ({ files, workPath, entrypoint }) => {
+exports.build = async ({
+  files, workPath, entrypoint, config,
+}) => {
+  console.log('Running with config: ', JSON.stringify(config));
+
   validateEntrypoint(entrypoint);
 
   console.log('downloading user files...');
