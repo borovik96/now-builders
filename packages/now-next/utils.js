@@ -128,7 +128,13 @@ function onlyStaticDirectory(files) {
  * Enforce specific package.json configuration for smallest possible lambda
  * @param {{dependencies?: any, devDependencies?: any, scripts?: any}} defaultPackageJson
  */
-function normalizePackageJson(defaultPackageJson = {}) {
+function normalizePackageJson(defaultPackageJson = {}, userOptions = {}) {
+  const options = Object.assign(
+    {
+      buildPath: '.',
+    },
+    userOptions,
+  );
   const dependencies = {};
   const devDependencies = {
     ...defaultPackageJson.dependencies,
@@ -164,7 +170,9 @@ function normalizePackageJson(defaultPackageJson = {}) {
     },
     scripts: {
       ...defaultPackageJson.scripts,
-      'now-build': 'NODE_OPTIONS=--max_old_space_size=3000 next build --lambdas',
+      'now-build': `NODE_OPTIONS=--max_old_space_size=3000 next build --lambdas ${
+        options.buildPath
+      }`,
     },
   };
 }

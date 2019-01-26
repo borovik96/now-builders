@@ -80,7 +80,6 @@ exports.build = async ({
   files, workPath, entrypoint, config,
 }) => {
   console.log('Running with config: ', JSON.stringify(config));
-
   validateEntrypoint(entrypoint);
 
   console.log('downloading user files...');
@@ -134,6 +133,7 @@ exports.build = async ({
   })();
 
   console.log(`MODE: ${isLegacy ? 'legacy' : 'serverless'}`);
+  const buildPath = config.buildPath || '.';
 
   if (isLegacy) {
     try {
@@ -152,7 +152,7 @@ exports.build = async ({
       "WARNING: your application is being deployed in @now/next's legacy mode.",
     );
     console.log('normalizing package.json');
-    const packageJson = normalizePackageJson(pkg);
+    const packageJson = normalizePackageJson(pkg, config);
     console.log('normalized package.json result: ', packageJson);
     await writePackageJson(workPath, packageJson);
   } else if (!pkg.scripts || !pkg.scripts['now-build']) {
@@ -160,7 +160,7 @@ exports.build = async ({
       'WARNING: "now-build" script not found. Adding \'"now-build": "next build"\' to "package.json" automatically',
     );
     pkg.scripts = {
-      'now-build': 'next build',
+      'now-build': `next build ${buildPath}`,
       ...(pkg.scripts || {}),
     };
     console.log('normalized package.json result: ', pkg);
@@ -195,7 +195,7 @@ exports.build = async ({
     let buildId;
     try {
       buildId = await readFile(
-        path.join(workPath, '.next', 'BUILD_ID'),
+        path.join(workPath, buildPath, '.next', 'BUILD_ID'),
         'utf8',
       );
     } catch (err) {
@@ -204,8 +204,14 @@ exports.build = async ({
       );
       throw new Error('Missing BUILD_ID');
     }
-    const dotNextRootFiles = await glob('.next/*', workPath);
-    const dotNextServerRootFiles = await glob('.next/server/*', workPath);
+    const dotNextRootFiles = await glob(
+      '.next/*',
+      path.join(workPath, buildPath),
+    );
+    const dotNextServerRootFiles = await glob(
+      '.next/server/*',
+      path.join(workPath, buildPath),
+    );
     const nodeModules = excludeFiles(
       await glob('node_modules/**', workPath),
       file => file.startsWith('node_modules/.cache'),
@@ -224,7 +230,15 @@ exports.build = async ({
     }
     const pages = await glob(
       '**/*.js',
-      path.join(workPath, '.next', 'server', 'static', buildId, 'pages'),
+      path.join(
+        workPath,
+        buildPath,
+        '.next',
+        'server',
+        'static',
+        buildId,
+        'pages',
+      ),
     );
     const launcherPath = path.join(__dirname, 'legacy-launcher.js');
     const launcherData = await readFile(launcherPath, 'utf8');
@@ -243,17 +257,35 @@ exports.build = async ({
         );
 
         const pageFiles = {
-          [`.next/server/static/${buildId}/pages/_document.js`]: filesAfterBuild[
-            `.next/server/static/${buildId}/pages/_document.js`
+          [path.join(
+            buildPath,
+            `.next/server/static/${buildId}/pages/_document.js`,
+          )]: filesAfterBuild[
+            path.join(
+              buildPath,
+              `.next/server/static/${buildId}/pages/_document.js`,
+            )
           ],
-          [`.next/server/static/${buildId}/pages/_app.js`]: filesAfterBuild[
-            `.next/server/static/${buildId}/pages/_app.js`
+          [path.join(
+            buildPath,
+            `.next/server/static/${buildId}/pages/_app.js`,
+          )]: filesAfterBuild[
+            path.join(buildPath, `.next/server/static/${buildId}/pages/_app.js`)
           ],
-          [`.next/server/static/${buildId}/pages/_error.js`]: filesAfterBuild[
-            `.next/server/static/${buildId}/pages/_error.js`
+          [path.join(
+            buildPath,
+            `.next/server/static/${buildId}/pages/_error.js`,
+          )]: filesAfterBuild[
+            path.join(
+              buildPath,
+              `.next/server/static/${buildId}/pages/_error.js`,
+            )
           ],
-          [`.next/server/static/${buildId}/pages/${page}`]: filesAfterBuild[
-            `.next/server/static/${buildId}/pages/${page}`
+          [path.join(
+            buildPath,
+            `.next/server/static/${buildId}/pages/${page}`,
+          )]: filesAfterBuild[
+            path.join(buildPath, `.next/server/static/${buildId}/pages/${page}`)
           ],
         };
 
@@ -280,7 +312,7 @@ exports.build = async ({
     };
     const pages = await glob(
       '**/*.js',
-      path.join(workPath, '.next', 'serverless', 'pages'),
+      path.join(workPath, buildPath, '.next', 'serverless', 'pages'),
     );
 
     const pageKeys = Object.keys(pages);
@@ -316,7 +348,7 @@ exports.build = async ({
 
   const nextStaticFiles = await glob(
     '**',
-    path.join(workPath, '.next', 'static'),
+    path.join(workPath, buildPath, '.next', 'static'),
   );
   const staticFiles = Object.keys(nextStaticFiles).reduce(
     (mappedFiles, file) => ({
